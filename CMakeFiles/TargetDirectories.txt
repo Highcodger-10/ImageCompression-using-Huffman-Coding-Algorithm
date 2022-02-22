@@ -1,0 +1,9 @@
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/Experimental.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/Nightly.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/Continuous.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/NightlyMemoryCheck.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/DSA_ImageCompressionproject.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/PACKAGE.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/RUN_TESTS.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/ALL_BUILD.dir
+D:/4thsem/4th semester/DSA_ImageCompressionproject/CMakeFiles/ZERO_CHECK.dir
