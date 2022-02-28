@@ -213,7 +213,7 @@ public:
 				idct(block8, block8);
 
 				// Converting it back to unsigned char
-				block8.convertTo(block8, CV_8UC1);
+				// block8.convertTo(block8, CV_8UC1);
 
 				// Copying the block back to the new dct image
 				// cout << "Copyto\n";
@@ -262,10 +262,10 @@ public:
 
 		// transform image Mat to vector
 		vector<int> inputFile;
-		cout << dctImage.size().height << endl;
-		cout << dctImage.size().width << endl;
+		cout << dctImage.size().height << endl;//65
+		cout << dctImage.size().width << endl;//65
 		inputFile.assign(dctImage.datastart, dctImage.dataend);
-		cout << inputFile.size() << endl;
+		cout << inputFile.size() << endl;//4225
 
 		// Codify image dct based on table of code from Huffman
 		cout << "\nEncoding Image with Huffman...";
@@ -282,9 +282,12 @@ public:
 		cout << "\nPrinting Image...";
 		size_t imSize = codifiedImage.size();
 		// cout << imSize << endl;
-		for (size_t i = 0; i < imSize; i += 8)
-		{
-			outfile << (uchar)strtol(codifiedImage.substr(i, 8).c_str(), 0, 2);
+		// for (size_t i = 0; i < imSize; i += 8)
+		// {
+		// 	outfile << (uchar)strtol(codifiedImage.substr(i, 8).c_str(), 0, 2);
+		// }
+		for (size_t i = 0; i < imSize; i++){
+			outfile << codifiedImage[i];
 		}
 		codifiedImage.clear();
 
@@ -313,13 +316,13 @@ public:
 
 		cout << "\nReading Codified Image ...";
 		readCodifiedImage();
-		cout << codifiedImage.size() << endl;	//242 in the case of lena.compressed
+		cout << codifiedImage.size() << endl;	//242 in the case of lena.compressed aba chai 26610 nai aayo
 
 		cout << "\nDecoding Image with Huffman...";
 		vector<int> dctFile = h.decode(codifiedImage);
 
 		dctImage = Mat::zeros(height * C / 8, width * C / 8, CV_8UC1);
-		cout << dctFile.size() << endl;
+		cout << dctFile.size() << endl;	//4225 in the case of lena.compressed
 		cout << width*C/8 << endl;
 		cout << dctImage.step << endl;
 		cout << "\nTransforming Image...";
@@ -327,7 +330,7 @@ public:
 		{
 			for (int j = 0; j < width * C / 8; j++)
 			{
-				dctImage.at<uchar>(i, j) = (uchar)dctFile[i * width * C / 8 + j];
+				dctImage.at<uchar>(i, j) = (uchar)dctFile[i * dctImage.step + j];
 			}
 		}
 		cout << "\nProcessing Image...";
@@ -341,7 +344,7 @@ public:
 
 		// imwrite(this->fileName, grayImage);
 		imwrite(this->fileName, grayImage);
-		Mat testcolor = imread(this->fileName, IMREAD_COLOR);
+		// Mat testcolor = imread(this->fileName, IMREAD_COLOR);
 		// imwrite("output.png", testcolor);
 		cout << "\nImage Build Successfully!";
 	}
@@ -382,42 +385,51 @@ public:
 
 
 
-	void readCodifiedImage()
-	{
-		vector<char> coded_string;
+	// void readCodifiedImage()
+	// {
+	// 	vector<char> coded_string;
+	// 	unsigned char c;
+	// 	unsigned char mask = 128; // 1000 0000
+	// 	// codifiedImage.clear();
+
+	// 	int count  = 0;
+
+	// 	// infile >> noskipws;
+	// 	infile >> c;
+
+	// 	while (infile >> c)
+	// 	{
+	// 		for (int i = 0; i < 8; i++)
+	// 		{
+	// 			//actual bitmasking to get values corresponding to the bit in the binary file
+	// 			if (((c << i) & mask) == mask)		//c << i means left shifting i bits 
+	// 			{
+	// 				coded_string.push_back('1');
+	// 			}
+	// 			else
+	// 			{
+	// 				coded_string.push_back('0');
+	// 			}
+	// 			count++;	//for debugging purpose
+	// 			cout << c << endl;
+	// 		}
+	// 		// infile>>c;
+	// 	}
+	// 	string codedImage(coded_string.begin(), coded_string.end());
+	// 	codifiedImage = codedImage;
+	// 	cout << "\nString work done" << endl;
+	// 	codifiedImage.erase(codifiedImage.length() - numberBitsShifted, numberBitsShifted); // remove the exceed bits
+	// 	cout << count << endl;	//240 in the case of lena.compresses
+	// 	cout << codifiedImage.length()<<endl;
+	// }	
+
+	void readCodifiedImage(){
 		unsigned char c;
-		unsigned char mask = 128; // 1000 0000
-		// codifiedImage.clear();
-
-		int count  = 0;
-
-		// infile >> noskipws;
-		infile >> c;
-
-		while (infile >> c)
-		{
-			for (int i = 0; i < 8; i++)
-			{
-				//actual bitmasking to get values corresponding to the bit in the binary file
-				if (((c << i) & mask) == mask)		//c << i means left shifting i bits 
-				{
-					coded_string.push_back('1');
-				}
-				else
-				{
-					coded_string.push_back('0');
-				}
-				count++;	//for debugging purpose
-			}
-			// infile>>c;
+		while(infile >> c){
+			codifiedImage.push_back(c);
 		}
-		string codedImage(coded_string.begin(), coded_string.end());
-		codifiedImage = codedImage;
-		cout << "\nString work done" << endl;
-		codifiedImage.erase(codifiedImage.length() - numberBitsShifted, numberBitsShifted); // remove the exceed bits
-		cout << count << endl;	//240 in the case of lena.compresses
-		cout << codifiedImage.length()<<endl;
-	}	
+		codifiedImage.erase(codifiedImage.length() - numberBitsShifted, numberBitsShifted);
+	}
 	
 	// void readCodifiedImage(){
 	// 	infile >> noskipws;
