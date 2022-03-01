@@ -10,22 +10,23 @@ struct node
 {
 	node *leftChild;
 	node *rightChild;
-	int frequency;
-	int content;
-	string code;
-
+	int frequency;	//for number of times of the occurence
+	int content;		//label for the ndoe as from the histogram
+	string code;		//actual code for the node as from huffman algorithm
 	bool operator<(const node &a) const { return (frequency > a.frequency); }
 };
 
 class Huffman
 {
-	priority_queue<node> nodeArray;
-	vector<float> codeTable;
-	vector<string> symbolTable;
-	vector<int> image;
+	priority_queue<node> nodeArray;	//data strored as minheap
+	vector<float> codeTable;		//to store the frequency fo each node
+	vector<string> symbolTable;		//to store the code(string) for the nodes in min order in priority queue
+	vector<int> image;			//vector to store the dct image in vector form
 
 public:
 	// Huffman(){};
+
+	//member function to return the rootnode for the huffman tree
 	node getHuffmanTree()
 	{
 		while (!nodeArray.empty())
@@ -53,6 +54,7 @@ public:
 		return nodeArray.top();
 	}
 
+	//Breadth first searching for symbol for the content in the tree
 	void BFS(node *temproot, string s)
 	{
 		node *root1 = new node;
@@ -83,18 +85,20 @@ public:
 		}
 	}
 
+	//computes and returns the table of symbols
 	vector<float> getHuffmanCode()
 	{
 		node root = getHuffmanTree(); // construct the huffman tree
-
+		//UCHAR_MAX is from limits header in C to get the max value of an unsigned char object it returns the max size that an unsigned char can store which is 255
 		codeTable.resize(UCHAR_MAX + 1);	 // Code table with 256 bins
 		symbolTable.resize(UCHAR_MAX + 1); // Code table with 256 bins
 
-		BFS(&root, ""); // Search tree-basead code with BFS algorithm
+		BFS(&root, ""); // Search tree-basead code with Breadth first searching
 
 		return codeTable; // return table of symbols
 	}
 
+	// sets up the frequency table to create the huffman tree
 	void setFrequenceTable(vector<float> f)
 	{
 		for (unsigned i = 0; i < f.size(); i++)
@@ -116,6 +120,8 @@ public:
 		nodeArray.push(temp);
 	}
 
+
+	// to encode into 0s and 1s based on the optimal prefix coding of huffman coding algorithm
 	string encode(vector<int> e)
 	{
 		string codifiedImage = "";
@@ -131,6 +137,7 @@ public:
 		return codifiedImage;
 	}
 
+	// to decode the string
 	vector<int> decode(string d)
 	{
 		node root = getHuffmanTree();
@@ -140,6 +147,8 @@ public:
 		return image;
 	}
 
+
+	// used to traverse to decode a particular bit pattern in string im passed as argument
 	void searchContent(node *root, string im)
 	{
 		node *n = new node;

@@ -14,29 +14,31 @@ using namespace cv;
 class Compressor
 {
 	Huffman h;
-	Mat grayImage; // Original image converted to monochromatic
-	Mat dctImage;	 // Image DCT quantized
+	Mat grayImage; // monochromatic version of the original image
+	Mat dctImage;	 // DCT of the monochromatic image
 	int height, heightDCT;
 	int width, widthDCT;
-	int C;						// Compression Param
-	int *zigZagMask;		// A mask to zig-zag search
-	string *shiftedBit; // Mask for shift bits in string
+	int C;						// compression parameter
+	int *zigZagMask;		// masking for zigzag search in an image
+	string *shiftedBit; // masking for shifted bits in a string to make the binary file byte compatible of the string for the codified image is to be stored as binary in the .compressed file
 	unsigned int numberBitsShifted;
-	Mat luminance;											 // Quantization Matrix for luminance
-	priority_queue<node> frequenceTable; // Frequence table for Huffman Algorithm
-	ofstream outfile;										 // To write in .compressed
-	ifstream infile;										 // To read from .compressed
-	string codifiedImage;								 // Image after huffman codification
+	Mat luminance;											 // Quantization matrix for luminance which has a fix value as defined in the constructor
+	priority_queue<node> frequenceTable; // frequency table for huffman coding
+	ofstream outfile;										 // to write in .compressed binary file used to compress
+	ifstream infile;										 // to read from .compressed binary file used to decompress
+	string codifiedImage;								 // image after huffman codification in the form of 0s and 1s
 	string fileName;										 // Name of the file .compressed
-	vector<float> codeTable;
+	vector<float> codeTable;							//to store the frequency of each node 
 
 public:
+
+	// to set masking and the quantization and intialize other variables
 	Compressor()
 	{
-		// Mask to shiftting a bit in string
+		// to add zeros to the end of the file to actually complete a byte
 		static string bitsMask[10] = {"", "0", "00", "000", "0000", "00000", "000000", "0000000", "00000000"};
 		shiftedBit = bitsMask;
-
+		// to traverse the DCT image in zigzag order, we use zzmask
 		static int zzMask[64] = {
 				0, 1, 8, 16, 9, 2, 3, 10,
 				17, 24, 32, 25, 18, 11, 4, 5,
@@ -48,7 +50,7 @@ public:
 				53, 60, 61, 54, 47, 55, 62, 63};
 		zigZagMask = zzMask;
 
-		// Create the luminance matrix for quantization
+		// luminance is to perform the quantization and rounding off the transformed sub-image(matrix
 		luminance = (Mat_<float>(8, 8) << 16, 11, 10, 16, 24, 40, 51, 61,
 								 12, 12, 14, 19, 26, 58, 60, 55,
 								 14, 13, 16, 24, 40, 57, 69, 56,
@@ -71,27 +73,26 @@ public:
 
 	void setParamCompression(char *imageName)
 	{
-		/// Load image in gray scale
+		//loading image in grayscale to gat single channel as encoding in a simple 2D array gets easier but it is not reversible :(
 		grayImage = imread(imageName, IMREAD_GRAYSCALE);
 
-		// Check if image exist
+		// checking if the image actually exists
 		if (!grayImage.data)
 		{
 			cout << "\nCan't load the image. Please insert the image address." << endl;
 			throw exception();
 		}
 
-		// Modify the image names to .compressed
+		// madifying the image to .compressed binary file
 		fileName.clear();
 		fileName.append(imageName);
 		fileName.erase(fileName.end() - 4, fileName.end());
 		fileName += ".compressed"; // sufix
 
 		// Open output streams to .compressed
-		outfile.open(fileName.c_str());
+		outfile.open(fileName.c_str());	//here c_str() returns a pointer to the string
 
-		// Transform the image resolutions to a resolution with size multiple of 8 by 8
-		// Necessary to broke the image in 8 by 8 blocks in DCT step
+		// to break the block of image into 8*8 to perform DCT we transform the resoluton of the image to an image whose resolution is a multiple of 8*8
 		height = grayImage.size().height;
 		width = grayImage.size().width;
 
@@ -112,45 +113,13 @@ public:
 			width += widthDCT;
 		}
 
-		// Write the image's size in .compressed
+		//writing the details to the .compressed file so that we get the parameters during decompression
 		outfile << height << " " << width << endl;
 		outfile << heightDCT << " " << widthDCT << endl;
 	}
 
 
-	void setParamDecompression(char *imageName)
-	{
-		fileName.clear();
-		fileName.append(imageName);
-
-		if (fileName.substr(fileName.length() - 11, fileName.length()) != ".compressed")
-		{
-			cout << "\nCan't load the image. Please insert the image address." << endl;
-			throw exception();
-		}
-		fileName.erase(fileName.length() - 11, fileName.length());
-		fileName += ".cmp.png";
-
-		infile.open(imageName);
-		if (!infile.is_open())
-		{
-			cout << "\nCan't load the image. Please insert the image address." << endl;
-			throw exception();
-		}
-
-		string size; // Get the original size of the image
-		infile >> size;
-		height = atoi(size.c_str());
-		infile >> size;
-		width = atoi(size.c_str());
-
-		infile >> size;
-		heightDCT = atoi(size.c_str());
-		infile >> size;
-		widthDCT = atoi(size.c_str());
-	}
-
-
+	//DCT transformation to comvert the image matrix from one domain to another as done in actual jpeg compression
 	void forwardDCT()
 	{
 		dctImage = Mat_<uchar>(height * C / 8, width * C / 8);
@@ -184,6 +153,134 @@ public:
 	} // Forward transformation - DCT
 
 
+	//Actual compression happens here
+	void compress(char *imageName)
+	{
+		// Just for information
+		cout << "\nCompressing...";
+
+		cout << "\nSetting Parameter...";
+		setParamCompression(imageName);
+
+		cout << "\nTransforming Image...";
+		forwardDCT();
+
+		cout << "\nSearching Frequency Table...";
+		searchFrequenceTable();
+
+		cout << "\nComputing Symbol Table...";
+		codeTable = h.getHuffmanCode();
+
+		// Write the Frequency Table in the file
+		cout << "\nPrinting Frequency Table...";
+		for (unsigned short i = 0; i < codeTable.size(); i++)
+		{
+			if (codeTable.at(i) == 0)	//i.e. at index i in histogram whether frequency of zero or not if zero no need to write to file
+				continue;
+			outfile << i << " " << codeTable.at(i) << endl;
+		}
+
+		// transform image Mat to vector
+		vector<int> inputFile;
+		cout << dctImage.size().height << endl;//65
+		cout << dctImage.size().width << endl;//65
+		inputFile.assign(dctImage.datastart, dctImage.dataend);
+		cout << inputFile.size() << endl;//4225
+
+		// codifying image DCT based on the table of code from huffman tree
+		cout << "\nEncoding Image with Huffman...";
+		codifiedImage = h.encode(inputFile);
+		cout << codifiedImage.size() << endl;
+
+		//adding 0s to the end of the file to actually complete a byte
+		numberBitsShifted = 8 - codifiedImage.length() % 8;
+		codifiedImage += shiftedBit[numberBitsShifted];
+
+		// end of the code table and the number of bits 0 shifted in the end of the file
+		outfile << "#" << numberBitsShifted << endl;
+
+		cout << "\nPrinting Image...";
+		size_t imSize = codifiedImage.size();
+		// cout << imSize << endl;
+		// for (size_t i = 0; i < imSize; i += 8)
+		// {
+		// 	outfile << (uchar)strtol(codifiedImage.substr(i, 8).c_str(), 0, 2);
+		// }
+
+		//actually writing binary code
+		for (size_t i = 0; i < imSize; i++){
+			outfile << codifiedImage[i];
+		}
+		codifiedImage.clear();
+
+		// Close the file .compressed
+		outfile.close();
+
+		// Just for information
+		if (!codifiedImage.length())
+			cout << "\nCompressing Successful!";
+		else
+			cout << "\nCompressing Failed!";
+	} 
+
+	// computing the histogram matrix for DCT image in plane so that we could get frequency table
+	void searchFrequenceTable()
+	{
+		int histSize = 256; /// Establish the number of bins
+
+		float range[] = {0, 256}; /// Set the ranges
+		const float *histRange = {range};
+
+		bool uniform = true;
+		bool accumulate = false;
+
+		Mat histogram; // Histogram for DCT Image
+
+		calcHist(&dctImage, 1, 0, Mat(), histogram, 1, &histSize, &histRange, uniform, accumulate);
+		vector<float> f(histogram.begin<float>(), histogram.end<float>()); // Transform mat to vector
+		h.setFrequenceTable(f);
+	}
+
+
+	//setting parameter for decompression as from the .compressed file
+	void setParamDecompression(char *imageName)
+	{
+		fileName.clear();
+		fileName.append(imageName);
+
+		//to check of it is actually .compressed file
+		if (fileName.substr(fileName.length() - 11, fileName.length()) != ".compressed")
+		{
+			cout << "\nCan't load the image. Please insert the image address." << endl;
+			throw exception();
+		}
+		fileName.erase(fileName.length() - 11, fileName.length());
+		fileName += ".cmp.png";
+
+		infile.open(imageName);
+		if (!infile.is_open())
+		{
+			cout << "\nCan't load the image. Please insert the image address." << endl;
+			throw exception();
+		}
+
+		string size; // Get the original size of the image
+
+		//converting string to integer to get the actual height width heightDCT and widthDCT for the image extraction(monochromatic)
+		infile >> size;
+		height = atoi(size.c_str());
+		infile >> size;
+		width = atoi(size.c_str());
+		infile >> size;
+		heightDCT = atoi(size.c_str());
+		infile >> size;
+		widthDCT = atoi(size.c_str());
+	}
+
+
+	
+
+
 
 	void inverseDCT()
 	{
@@ -193,10 +290,10 @@ public:
 		{
 			for (int j = 0; j < width * C / 8; j += C)
 			{
-				// Get a block 8x8 for each position on image
+				// Get a block 8x8 for each position on image for inverse transformation as done in compression
 				Mat block = dctImage(Rect(j, i, C, C));
 
-				// Convert block from 8 bits to 64 bits
+				// Convert block from 8 bits to 64 bits for actual inverse dct
 				block.convertTo(block, CV_32FC1);
 
 				// Subtracting the block by 128
@@ -223,7 +320,7 @@ public:
 	} // Inverse transformation - iDCT
 
 
-
+	//this doesn't run as function is never called
 	void displayImage(string imageName, Mat image)
 	{
 		/// Display
@@ -234,75 +331,10 @@ public:
 
 
 
-	void compress(char *imageName)
-	{
-		// Just for information
-		cout << "\nCompressing...";
-
-		cout << "\nSetting Parameter...";
-		setParamCompression(imageName);
-
-		cout << "\nTransforming Image...";
-		forwardDCT();
-
-		cout << "\nSearching Frequency Table...";
-		searchFrequenceTable();
-
-		cout << "\nComputing Symbol Table...";
-		codeTable = h.getHuffmanCode();
-
-		// Write the Frequency Table in the file
-		cout << "\nPrinting Frequency Table...";
-		for (unsigned short i = 0; i < codeTable.size(); i++)
-		{
-			if (codeTable.at(i) == 0)
-				continue;
-			outfile << i << " " << codeTable.at(i) << endl;
-		}
-
-		// transform image Mat to vector
-		vector<int> inputFile;
-		cout << dctImage.size().height << endl;//65
-		cout << dctImage.size().width << endl;//65
-		inputFile.assign(dctImage.datastart, dctImage.dataend);
-		cout << inputFile.size() << endl;//4225
-
-		// Codify image dct based on table of code from Huffman
-		cout << "\nEncoding Image with Huffman...";
-		codifiedImage = h.encode(inputFile);
-		cout << codifiedImage.size() << endl;	//26610 in the case of lena.png
-
-		// Add 0's in the end of the file to complete a byte
-		numberBitsShifted = 8 - codifiedImage.length() % 8;
-		codifiedImage += shiftedBit[numberBitsShifted];
-
-		// End of the code table and the number of bits 0 shifted in the end of the file
-		outfile << "#" << numberBitsShifted << endl;
-
-		cout << "\nPrinting Image...";
-		size_t imSize = codifiedImage.size();
-		// cout << imSize << endl;
-		// for (size_t i = 0; i < imSize; i += 8)
-		// {
-		// 	outfile << (uchar)strtol(codifiedImage.substr(i, 8).c_str(), 0, 2);
-		// }
-		for (size_t i = 0; i < imSize; i++){
-			outfile << codifiedImage[i];
-		}
-		codifiedImage.clear();
-
-		// Close the file .compressed
-		outfile.close();
-
-		// Just for information
-		if (!codifiedImage.length())
-			cout << "\nCompressing Successful!";
-		else
-			cout << "\nCompressing Failed!";
-	} // Execute Huffman to create a table of symbols and codify the image to a file
+	
 
 
-
+	//actual decompression
 	void decompress(char *imageName)
 	{
 		// Just for information
@@ -316,7 +348,7 @@ public:
 
 		cout << "\nReading Codified Image ...";
 		readCodifiedImage();
-		cout << codifiedImage.size() << endl;	//242 in the case of lena.compressed aba chai 26610 nai aayo
+		cout << codifiedImage.size() << endl;
 
 		cout << "\nDecoding Image with Huffman...";
 		vector<int> dctFile = h.decode(codifiedImage);
@@ -334,6 +366,7 @@ public:
 			}
 		}
 		cout << "\nProcessing Image...";
+		//actual processing of the matrix
 		inverseDCT();
 
 		if (widthDCT != 0)
@@ -350,22 +383,6 @@ public:
 	}
 
 	
-	void searchFrequenceTable()
-	{
-		int histSize = 256; /// Establish the number of bins
-
-		float range[] = {0, 256}; /// Set the ranges
-		const float *histRange = {range};
-
-		bool uniform = true;
-		bool accumulate = false;
-
-		Mat histogram; // Histogram for DCT Image
-
-		calcHist(&dctImage, 1, 0, Mat(), histogram, 1, &histSize, &histRange, uniform, accumulate);
-		vector<float> f(histogram.begin<float>(), histogram.end<float>()); // Transform mat to vector
-		h.setFrequenceTable(f);
-	} // Search the frequency table and set it in huffman's codification.
 
 
 	void readCodeTable()
@@ -384,6 +401,14 @@ public:
 	} // Read from .compressed the frequency table and set it in huffman's codification.
 
 
+
+	void readCodifiedImage(){
+		unsigned char c;
+		while(infile >> c){
+			codifiedImage.push_back(c);
+		}
+		codifiedImage.erase(codifiedImage.length() - numberBitsShifted, numberBitsShifted);
+	}
 
 	// void readCodifiedImage()
 	// {
@@ -423,13 +448,7 @@ public:
 	// 	cout << codifiedImage.length()<<endl;
 	// }	
 
-	void readCodifiedImage(){
-		unsigned char c;
-		while(infile >> c){
-			codifiedImage.push_back(c);
-		}
-		codifiedImage.erase(codifiedImage.length() - numberBitsShifted, numberBitsShifted);
-	}
+	
 	
 	// void readCodifiedImage(){
 	// 	infile >> noskipws;
